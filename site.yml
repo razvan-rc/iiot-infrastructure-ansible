@@ -1,0 +1,25 @@
+---
+- name: Setari de baza pentru toate serverele
+  hosts: all
+  become: yes  # Ruleaza comenzile cu sudo
+  roles:
+    - common
+
+# Urmatoarele le vom decomenta pe masura ce le cream:
+- name: Configurare DB Master
+  hosts: db_master
+  become: yes
+  roles:
+    - db_master
+
+- name: Configurare DB Slave
+  hosts: db_slave
+  become: yes
+  roles:
+    - db_slave
+
+- name: Configurare Web Server
+  hosts: web_servers
+  become: yes
+  roles:
+    - web

@@ -1,0 +1,6 @@
+---
+# Restart service to apply the new 99-replication.cnf configuration
+- name: Restart MariaDB
+  service:
+    name: mariadb
+    state: restarted

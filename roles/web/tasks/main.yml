@@ -1,0 +1,25 @@
+---
+# Install required packages for hosting a Python web application
+- name: Install Nginx and Python environments
+  apt:
+    name:
+      - nginx
+      - python3-pip
+      - python3-venv
+    state: present
+
+# Ensure the Nginx web server is running and enabled on system boot
+- name: Ensure Nginx is started
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+# Create the root directory where the CI/CD pipeline will deploy the app code
+- name: Create application directory (/var/www/industrial_app)
+  file:
+    path: /var/www/industrial_app
+    state: directory
+    owner: ubuntu      # The user that CI/CD will use to SSH and deploy
+    group: www-data    # The group Nginx uses
+    mode: '0775'

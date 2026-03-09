@@ -1,0 +1,12 @@
+[mysqld]
+# Allow external connections (needed for Web Server)
+bind-address = 0.0.0.0
+
+# Unique server ID (Slave must have a different ID than Master, e.g., 2)
+server-id = 2
+
+# Prevent accidental direct writes to the slave database
+read_only = 1
+
+# Relay log settings (required for slave nodes)
+relay-log = /var/log/mysql/mysql-relay-bin.log

@@ -1,0 +1,7 @@
+# SSH
+*.pem
+*.ppk
+
+# tmp Ansible
+*.retry
+.ansible/

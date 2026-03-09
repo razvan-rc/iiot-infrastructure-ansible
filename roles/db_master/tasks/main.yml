@@ -1,0 +1,45 @@
+---
+- name: Instalare pachet MariaDB Server
+  apt:
+    name: mariadb-server
+    state: present
+
+- name: Adaugare configuratie de Master pentru replicare
+  template:
+    src: 99-replication.cnf.j2
+    dest: /etc/mysql/mariadb.conf.d/99-replication.cnf
+  notify: Restart MariaDB
+
+- name: Asigurare ca serviciul MariaDB este pornit
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+- name: Creare baza de date ({{ db_name }})
+  mysql_db:
+    name: "{{ db_name }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Creare user pentru replicare
+  mysql_user:
+    name: "{{ repl_user }}"
+    password: "{{ repl_password }}"
+    priv: "*.*:REPLICATION SLAVE"
+    host: "%"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Creare tabel motor_telemetry (Schema bazei de date)
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    login_db: "{{ db_name }}"
+    query: >
+      CREATE TABLE IF NOT EXISTS motor_telemetry (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        motor_id VARCHAR(50),
+        temperature_celsius FLOAT,
+        vibration_mm_s FLOAT
+      )

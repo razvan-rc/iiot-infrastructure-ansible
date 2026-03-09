@@ -1,0 +1,36 @@
+---
+# Install the MariaDB Server package
+- name: Install MariaDB Server
+  apt:
+    name: mariadb-server
+    state: present
+
+# Apply the slave-specific configuration file
+- name: Configure Slave settings
+  template:
+    src: 99-replication.cnf.j2
+    dest: /etc/mysql/mariadb.conf.d/99-replication.cnf
+  notify: Restart MariaDB
+
+# Ensure the database service is running before setting up replication
+- name: Ensure MariaDB is started
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+# Dynamically fetch the Master's IP and configure the replication link
+- name: Setup replication connection (CHANGE MASTER TO)
+  mysql_replication:
+    mode: changemaster
+    # We use Ansible magic variables to get the IP of the db_master directly from the inventory
+    master_host: "{{ hostvars[groups['db_master'][0]]['ansible_host'] | default(groups['db_master'][0]) }}"
+    master_user: "{{ repl_user }}"
+    master_password: "{{ repl_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+# Start the slave thread to begin syncing data from the Master
+- name: Start slave thread
+  mysql_replication:
+    mode: startreplica
+    login_unix_socket: /var/run/mysqld/mysqld.sock

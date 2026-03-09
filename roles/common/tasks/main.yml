@@ -1,0 +1,19 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600 # nu face update daca a facut deja in ultima ora
+
+- name: Instalare pachete utilitare de baza
+  apt:
+    name:
+      - curl
+      - git
+      - htop
+      - ufw
+      - python3-pymysql # pentru a gestiona MariaDB din Ansible
+    state: present
+
+- name: Setare timezone (Europe/Bucharest)
+  timezone:
+    name: Europe/Bucharest

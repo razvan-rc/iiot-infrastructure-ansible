@@ -1,0 +1,11 @@
+[mysqld]
+# Allow external connections (needed for Slave DB and Web Server)
+bind-address = 0.0.0.0
+
+# Unique server ID
+server-id = 1
+
+log_bin = /var/log/mysql/mysql-bin.log
+binlog_format = mixed
+
+binlog_do_db = {{ db_name }}
