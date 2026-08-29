@@ -19,6 +19,14 @@
     state: started
     enabled: yes
 
+- name: Ensure /var/log/mysql directory exists for relay logs
+  file:
+    path: /var/log/mysql
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: '0755'
+
 # Dynamically fetch the Master's IP and configure the replication link
 - name: Setup replication connection (CHANGE MASTER TO)
   mysql_replication:
