@@ -22,7 +22,7 @@
 # Dynamically fetch the Master's IP and configure the replication link
 - name: Setup replication connection (CHANGE MASTER TO)
   mysql_replication:
-    mode: changemaster
+    mode: changeprimary
     # We use Ansible magic variables to get the IP of the db_master directly from the inventory
     master_host: "{{ hostvars[groups['db_master'][0]]['ansible_host'] | default(groups['db_master'][0]) }}"
     master_user: "{{ repl_user }}"
