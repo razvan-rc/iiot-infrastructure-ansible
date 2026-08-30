@@ -23,3 +23,39 @@
   become: yes
   roles:
     - web
+
+- name: Configurare Baza de Date Aplicatie (Post-Replicare)
+  hosts: db_master
+  become: yes
+  vars:
+    db_name: "industrial_db"
+  tasks:
+    - name: Create application database
+      mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Create festo_telemetry table
+      mysql_query:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_db: "{{ db_name }}"
+        query: >
+          CREATE TABLE IF NOT EXISTS festo_telemetry (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              container_id VARCHAR(50),
+              station_name VARCHAR(50),
+              container_color VARCHAR(20),
+              air_pressure_bar FLOAT,
+              status VARCHAR(20)
+          )
+
+    - name: Create database user for the Python sensor script
+      mysql_user:
+        name: "sensor_app"
+        password: "SenzorPass123!"
+        priv: "{{ db_name }}.festo_telemetry:INSERT,SELECT"
+        host: "%"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
