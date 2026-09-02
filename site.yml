@@ -5,7 +5,6 @@
   roles:
     - common
 
-# Urmatoarele le vom decomenta pe masura ce le cream:
 - name: Configurare DB Master
   hosts: db_master
   become: yes
@@ -18,11 +17,16 @@
   roles:
     - db_slave
 
-- name: Configurare Web Server
-  hosts: web_servers
+# --- NOU: Oprim simulatorul de pe Bastion (localhost) pentru a evita conflictele de date ---
+- name: Pauza Generator Date
+  hosts: localhost
   become: yes
-  roles:
-    - web
+  tasks:
+    - name: Opreste temporar Festo Simulator
+      systemd:
+        name: festo_simulator
+        state: stopped
+      ignore_errors: yes
 
 - name: Configurare Baza de Date Aplicatie (Post-Replicare)
   hosts: db_master
@@ -59,3 +63,20 @@
         host: "%"
         state: present
         login_unix_socket: /var/run/mysqld/mysqld.sock
+
+# --- NOU: Repornim simulatorul acum ca structura bazei de date e gata pe ambele servere ---
+- name: Start Generator Date
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Porneste Festo Simulator
+      systemd:
+        name: festo_simulator
+        state: started
+
+# L-am mutat la final: Web serverul se instalează doar după ce backend-ul (bazele de date) e 100% gata
+- name: Configurare Web Server
+  hosts: web_servers
+  become: yes
+  roles:
+    - web

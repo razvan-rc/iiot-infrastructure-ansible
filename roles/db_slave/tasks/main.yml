@@ -27,18 +27,38 @@
     group: mysql
     mode: '0755'
 
+- name: Verifica statusul replicarii
+  mysql_info:
+    filter: slave_status
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  register: replica_status
+
+- name: Verifica statusul replicarii (Shell brut)
+  command: mysql -e "SHOW SLAVE STATUS\G"
+  register: replica_status_raw
+  changed_when: false
+  ignore_errors: true
+
+# Fortam oprirea proceselor de replicare inainte sa rescriem setarile
+- name: Opreste slave-ul inainte de reconfigurare
+  mysql_replication:
+    mode: stopreplica
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  when: "'Slave_IO_Running: Yes' not in replica_status_raw.stdout"
+
 # Dynamically fetch the Master's IP and configure the replication link
 - name: Setup replication connection (CHANGE MASTER TO)
   mysql_replication:
     mode: changeprimary
-    # We use Ansible magic variables to get the IP of the db_master directly from the inventory
     master_host: "{{ hostvars[groups['db_master'][0]]['ansible_host'] | default(groups['db_master'][0]) }}"
     master_user: "{{ repl_user }}"
     master_password: "{{ repl_password }}"
     login_unix_socket: /var/run/mysqld/mysqld.sock
+  when: "'Slave_IO_Running: Yes' not in replica_status_raw.stdout"
 
 # Start the slave thread to begin syncing data from the Master
 - name: Start slave thread
   mysql_replication:
     mode: startreplica
     login_unix_socket: /var/run/mysqld/mysqld.sock
+  when: "'Slave_IO_Running: Yes' not in replica_status_raw.stdout"

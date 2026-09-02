@@ -1,12 +1,14 @@
 ---
 # Install required packages for hosting a Python web application
-- name: Install Nginx and Python environments
+- name: Install Nginx, Git, and Python environments
   apt:
     name:
       - nginx
+      - git
       - python3-pip
       - python3-venv
     state: present
+    update_cache: yes
 
 # Ensure the Nginx web server is running and enabled on system boot
 - name: Ensure Nginx is started
@@ -15,11 +17,87 @@
     state: started
     enabled: yes
 
-# Create the root directory where the CI/CD pipeline will deploy the app code
-- name: Create application directory (/var/www/industrial_app)
-  file:
+- name: Creare director aplicatie Web
+  ansible.builtin.file:
     path: /var/www/industrial_app
     state: directory
-    owner: ubuntu      # The user that CI/CD will use to SSH and deploy
-    group: www-data    # The group Nginx uses
+    owner: ubuntu
+    group: www-data
     mode: '0775'
+  become: yes
+
+- name: Clonare repository aplicatie Web
+  git:
+    repo: 'https://oauth2:{{ github_token }}@github.com/razvan-rc/iiot-web-app.git'
+    dest: /var/www/industrial_app
+    version: main
+    force: yes
+    accept_hostkey: yes
+  become: yes
+  become_user: ubuntu
+
+- name: Instalare dependente Python in venv
+  pip:
+    requirements: /var/www/industrial_app/requirements.txt
+    virtualenv: /var/www/industrial_app/venv
+    virtualenv_command: python3 -m venv
+
+- name: Instalare Gunicorn in venv
+  pip:
+    name: gunicorn
+    virtualenv: /var/www/industrial_app/venv
+
+- name: Configurare serviciu systemd pentru Gunicorn
+  copy:
+    dest: /etc/systemd/system/iiot-web.service
+    content: |
+      [Unit]
+      Description=Gunicorn instance to serve IIoT Festo Dashboard
+      After=network.target
+
+      [Service]
+      User=ubuntu
+      Group=www-data
+      WorkingDirectory=/var/www/industrial_app
+      Environment="PATH=/var/www/industrial_app/venv/bin"
+      ExecStart=/var/www/industrial_app/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 app:app
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Configurare Nginx Reverse Proxy
+  copy:
+    dest: /etc/nginx/sites-available/iiot-web
+    content: |
+      server {
+          listen 80;
+          server_name _;
+          location / {
+              proxy_pass http://127.0.0.1:5000;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+          }
+      }
+
+- name: Activare site Nginx si stergere default
+  file:
+    src: /etc/nginx/sites-available/iiot-web
+    dest: /etc/nginx/sites-enabled/iiot-web
+    state: link
+
+- name: Stergere configurare Nginx default
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Start si activare serviciu Gunicorn (iiot-web)
+  systemd:
+    name: iiot-web
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+
+- name: Restart Nginx pentru a aplica setarile
+  systemd:
+    name: nginx
+    state: restarted

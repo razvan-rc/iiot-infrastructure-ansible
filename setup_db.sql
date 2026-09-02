@@ -1,16 +1,21 @@
-DROP DATABASE IF EXISTS industrial_db;
-DROP USER IF EXISTS 'sensor_app'@'%';
-CREATE DATABASE industrial_db;
+-- Crearea bazei de date (daca nu exista)
+CREATE DATABASE IF NOT EXISTS industrial_db;
 USE industrial_db;
+
+-- Daca exista varianta veche a tabelului, o stergem pentru a face loc noii arhitecturi
+DROP TABLE IF EXISTS festo_telemetry;
+
+-- Crearea tabelului pentru Digital Twin (JSON)
 CREATE TABLE festo_telemetry (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    container_id VARCHAR(50),
-    station_name VARCHAR(50),
-    container_color VARCHAR(20),
-    air_pressure_bar FLOAT,
-    status VARCHAR(20)
+    timestamp DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+    station_name VARCHAR(50) NOT NULL,
+    payload_json JSON NOT NULL,
+    INDEX idx_station (station_name),
+    INDEX idx_timestamp (timestamp)
 );
-CREATE USER 'sensor_app'@'%' IDENTIFIED BY 'SenzorPass123!';
-GRANT INSERT, SELECT ON industrial_db.festo_telemetry TO 'sensor_app'@'%';
+
+-- Securitate: User-ul de aplicatie
+CREATE USER IF NOT EXISTS 'sensor_app'@'%' IDENTIFIED BY 'SenzorPass123!';
+GRANT ALL PRIVILEGES ON industrial_db.* TO 'sensor_app'@'%';
 FLUSH PRIVILEGES;
