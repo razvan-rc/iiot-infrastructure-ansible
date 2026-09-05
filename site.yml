@@ -54,6 +54,44 @@
             INDEX idx_timestamp (timestamp)
           )
 
+    - name: Check whether maintenance command table exists
+      mysql_query:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_db: "{{ db_name }}"
+        query: >
+          SELECT COUNT(*) AS table_count
+          FROM information_schema.tables
+          WHERE table_schema = '{{ db_name }}'
+            AND table_name = 'maintenance_commands'
+      register: maintenance_table_check
+      changed_when: false
+      tags:
+        - maintenance
+
+    - name: Create maintenance command and audit table
+      mysql_query:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_db: "{{ db_name }}"
+        query: >
+          CREATE TABLE IF NOT EXISTS maintenance_commands (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            station_name VARCHAR(64) NOT NULL,
+            action_type VARCHAR(32) NOT NULL,
+            component VARCHAR(64) NOT NULL DEFAULT 'station',
+            status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+            requested_by VARCHAR(64) NOT NULL DEFAULT 'dashboard',
+            notes VARCHAR(500) NOT NULL DEFAULT '',
+            parameters_json JSON NULL,
+            applied_at DATETIME(3) NULL,
+            result_json JSON NULL,
+            INDEX idx_maintenance_status (status, id),
+            INDEX idx_maintenance_station_time (station_name, created_at)
+          )
+      when: maintenance_table_check.query_result[0][0].table_count | int == 0
+      tags:
+        - maintenance
+
     # --- Permisiuni diferentiate pe Master (Read/Write) ---
 - name: Configurare Useri de Aplicatie (Master)
   hosts: db_master
@@ -70,6 +108,30 @@
         state: present
         login_unix_socket: /var/run/mysqld/mysqld.sock
 
+    - name: Grant simulator least-privilege access from controller host
+      mysql_user:
+        name: "sensor_app"
+        password: "SenzorPass123!"
+        priv: "{{ db_name }}.festo_telemetry:INSERT,SELECT/{{ db_name }}.maintenance_commands:SELECT,UPDATE"
+        host: "{{ hostvars['localhost']['ansible_default_ipv4']['address'] }}"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      no_log: true
+      tags:
+        - maintenance
+
+    - name: Grant dashboard command access from web server
+      mysql_user:
+        name: "sensor_app"
+        password: "SenzorPass123!"
+        priv: "{{ db_name }}.maintenance_commands:INSERT,SELECT"
+        host: "{{ hostvars[groups['web_servers'][0]]['ansible_host'] | default(groups['web_servers'][0]) }}"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      no_log: true
+      tags:
+        - maintenance
+
 # --- Permisiuni diferentiate pe Slave (Read-Only) ---
 - name: Configurare Useri de Aplicatie (Slave)
   hosts: db_slave
@@ -85,6 +147,18 @@
         host: "%"
         state: present
         login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Grant dashboard read-only access from web server
+      mysql_user:
+        name: "sensor_app"
+        password: "SenzorPass123!"
+        priv: "{{ db_name }}.festo_telemetry:SELECT/{{ db_name }}.maintenance_commands:SELECT"
+        host: "{{ hostvars[groups['web_servers'][0]]['ansible_host'] | default(groups['web_servers'][0]) }}"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      no_log: true
+      tags:
+        - maintenance
 
 # --- NOU: Repornim simulatorul acum ca structura bazei de date e gata pe ambele servere ---
 - name: Start Generator Date

@@ -1,0 +1,4 @@
+[Service]
+Environment="MAINTENANCE_CONTROL_TOKEN={{ maintenance_control_token }}"
+Environment="DB_READER_HOST={{ hostvars[groups['db_slave'][0]]['ansible_host'] | default(groups['db_slave'][0]) }}"
+Environment="DB_WRITER_HOST={{ hostvars[groups['db_master'][0]]['ansible_host'] | default(groups['db_master'][0]) }}"

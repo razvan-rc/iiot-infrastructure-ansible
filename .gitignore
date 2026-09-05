@@ -5,3 +5,7 @@
 # tmp Ansible
 *.retry
 .ansible/
+
+# Local secrets; keep real values outside Git
+group_vars/vault.yml
+*.local.yml

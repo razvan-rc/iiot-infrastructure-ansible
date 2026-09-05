@@ -1,0 +1,7 @@
+---
+- name: Restart IIoT web service
+  ansible.builtin.systemd:
+    name: iiot-web
+    state: restarted
+    daemon_reload: yes
+    enabled: yes

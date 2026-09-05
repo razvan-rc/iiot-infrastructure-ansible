@@ -35,6 +35,8 @@
     accept_hostkey: yes
   become: yes
   become_user: ubuntu
+  no_log: true
+  notify: Restart IIoT web service
 
 - name: Instalare dependente Python in venv
   pip:
@@ -64,6 +66,41 @@
 
       [Install]
       WantedBy=multi-user.target
+  notify: Restart IIoT web service
+
+- name: Validate maintenance control token
+  ansible.builtin.assert:
+    that:
+      - maintenance_control_token is defined
+      - maintenance_control_token | length >= 32
+      - maintenance_control_token | length <= 128
+      - maintenance_control_token is match('^[A-Za-z0-9_-]+$')
+    fail_msg: "maintenance_control_token must contain 32-128 URL-safe characters"
+  no_log: true
+  tags:
+    - maintenance
+
+- name: Create systemd drop-in directory for IIoT web service
+  ansible.builtin.file:
+    path: /etc/systemd/system/iiot-web.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  tags:
+    - maintenance
+
+- name: Configure maintenance API and database endpoints
+  ansible.builtin.template:
+    src: maintenance-control.conf.j2
+    dest: /etc/systemd/system/iiot-web.service.d/maintenance-control.conf
+    owner: root
+    group: root
+    mode: '0600'
+  notify: Restart IIoT web service
+  no_log: true
+  tags:
+    - maintenance
 
 - name: Configurare Nginx Reverse Proxy
   copy:
@@ -90,12 +127,14 @@
     path: /etc/nginx/sites-enabled/default
     state: absent
 
-- name: Start si activare serviciu Gunicorn (iiot-web)
+- name: Ensure Gunicorn service is started and enabled
   systemd:
     name: iiot-web
-    state: restarted
+    state: started
     daemon_reload: yes
     enabled: yes
+  tags:
+    - maintenance
 
 - name: Restart Nginx pentru a aplica setarile
   systemd:
