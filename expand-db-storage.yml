@@ -1,0 +1,51 @@
+---
+# Run after enlarging the EBS volumes. Targets the verified Ubuntu NVMe layout.
+# raw + TMPDIR in RAM allow recovery when the root filesystem is full.
+- name: Expand database root partitions and ext4 filesystems
+  hosts: databases
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  tasks:
+    - name: Verify root device, filesystem and expanded disk size
+      ansible.builtin.raw: |
+        set -eu
+        test "$(findmnt -n -o SOURCE /)" = /dev/nvme0n1p1
+        test "$(findmnt -n -o FSTYPE /)" = ext4
+        test "$(blockdev --getsize64 /dev/nvme0n1)" -ge 21474836480
+        command -v growpart
+        command -v resize2fs
+        df -h / /dev/shm
+      changed_when: false
+
+    - name: Preview root partition expansion
+      ansible.builtin.raw: TMPDIR=/dev/shm growpart -N /dev/nvme0n1 1
+      register: root_grow_preview
+      changed_when: false
+      failed_when: >-
+        root_grow_preview.rc != 0 and not
+        (root_grow_preview.rc == 1 and
+        'NOCHANGE:' in root_grow_preview.stdout)
+
+    - name: Expand verified root partition into available disk space
+      ansible.builtin.raw: TMPDIR=/dev/shm growpart /dev/nvme0n1 1
+      when: root_grow_preview.rc == 0
+      register: root_grow
+      changed_when: "'CHANGED:' in root_grow.stdout"
+
+    - name: Grow ext4 filesystem online
+      ansible.builtin.raw: resize2fs /dev/nvme0n1p1
+      register: root_resize
+      changed_when: >-
+        'Nothing to do!' not in
+        (root_resize.stdout ~ (root_resize.stderr | default('')))
+
+    - name: Verify expanded filesystem and show available space
+      ansible.builtin.raw: |
+        set -eu
+        test "$(df -B1 --output=size / | tail -n 1)" -ge 18000000000
+        lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS
+        df -h /
+      changed_when: false
+

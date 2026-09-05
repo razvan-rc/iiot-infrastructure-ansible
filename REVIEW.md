@@ -4,6 +4,26 @@ Review static al repository-ului Ansible și al integrării dashboard–simulato
 completat cu verificări pe VM-uri și reproduceri locale fără scrieri în DB.
 Nu reprezintă un test de reinstalare de la zero sau un audit al AWS Security Groups.
 
+## Actualizare după extinderea EBS — 2026-09-05
+
+Blocajul de spațiu descris mai jos a fost rezolvat. Utilizatorul a extins ambele
+volume EBS la 20 GiB; expand-db-storage.yml a extins online partiția rădăcină
+/dev/nvme0n1p1 și ext4, fără restart sau ștergere de date.
+Filesystemul rezultat este afișat ca 19G (partițiile de boot și metadatele ocupă
+restul): master ~12G liberi, replica ~14G liberi la verificare.
+
+Rularea site.yml --tags maintenance s-a încheiat cu succes, inclusiv granturile
+restrânse pe master. Rerularea ambelor playbookuri a raportat changed=0 și failed=0.
+Autentificarea simulatorului folosește sensor_app@172.31.38.49, iar dashboardul
+sensor_app@172.31.42.94 pe ambele DB-uri. Citirea comenzilor a fost verificată
+prin conexiuni noi din aplicații. Nu s-a trimis o comandă care să modifice uzura.
+Replicarea: IO=Yes, SQL=Yes, Seconds_Behind_Master=0, fără erori raportate;
+/api/live a returnat toate cele cinci module cu telemetrie mai recentă de o secundă.
+
+Constatările de mai jos păstrează dovezile review-ului inițial. Blocajul de deployment
+din secțiunea finală este istoric; politica de retenție/monitorizare a spațiului și
+celelalte probleme de logică/securitate rămân de remediat.
+
 ## Modificarea implementată
 
 - site.yml creează maintenance_commands pe master dacă lipsește, cu schema existentă
@@ -147,4 +167,3 @@ Nu reprezintă un test de reinstalare de la zero sau un audit al AWS Security Gr
 - Reproducerile refill/uzură au rulat în procese locale izolate, fără scrieri în DB.
 - Dashboardul este curat local la commit 413e3d6. Nu s-a verificat remote-ul GitHub
   în această reluare.
-

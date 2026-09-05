@@ -3,6 +3,19 @@
 Ansible configuration for the Festo simulator, MySQL primary/replica pair, and
 the IIoT dashboard.
 
+## Expanding database storage
+
+After increasing both database EBS volumes to at least 20 GiB in AWS, run:
+
+    ansible-playbook expand-db-storage.yml
+
+This playbook verifies the root device is /dev/nvme0n1p1 with ext4, previews and
+grows partition 1, then expands ext4 online. It uses RAM for growpart temporary
+files so it also works when the original root filesystem is full. It does not
+format disks or delete data. The boot partitions retain their existing layout.
+It is intentionally limited to the verified NVMe/ext4 layout and stops if the
+layout differs. Re-running after expansion should report no changes.
+
 ## Maintenance workflow
 
 The maintenance tag provisions the maintenance_commands audit/command table and
